@@ -41,6 +41,9 @@
 
 <!-- Three or four sentences: what a user asks for, and what they get back. -->
 
+FitFindr can help someone find the thrift listings based on what they want, their size, and their budget. You can simply ask, and it will suggest an outfit using clothes from their wardrobe and write a short caption for the look. 
+If FitFindr sees no listings match your description, it will communicate that to you and stop.
+
 
 
 ---
