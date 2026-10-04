@@ -63,15 +63,15 @@ If FitFindr sees no listings match your description, it will communicate that to
 ### `search_listings`
 
 - **What it does:** This tool searches for listings by description, specifically keywords and phrases; the other paramters are sizing and budget which are relevant to narrowing down for a precise search, but are not required.
-- **Inputs:** `description` (str), `size` (str or None), `max_price` (float or None).
-- **Returns:** A list of matching listing dictionaries is returned by the function containing: id, title, description, category, style tags, size, condition, price, colors, brand, and platform. Brands can also be None.
+- **Inputs:** `description` (str), `size` (str or None), `max_price` (float or None). Size matching ignores case: M matches S/M, but L does not match XL. The price limit is inclusive. None skips that filter.
+- **Returns:** A list of matching listing dictionaries is returned by the function containing: id, title, description, category, style_tags, size, condition, price, colors, brand, and platform. Brands can also be None. Results are ranked by keyword overlap and capped at `config.SEARCH_RESULT_LIMIT`.
 - **When it has nothing:** Simply returns an empty list `[]` if a listing isn't found.
 
 ### `suggest_outfit`
 
-- **What it does:** This tool creates one or two suggestions for outfits by using the thrifted item chose by the user and the user's current wardrobe. Based off of that, the model will generate an outfit suggestion.
+- **What it does:** This tool creates one or two suggestions for outfits by using the thrifted item selected from the search results and the user's current wardrobe. Based off of that, the model will generate an outfit suggestion.
 - **Inputs:** `new_item` (dict containing a listing), `wardrobe` (dict with an `items` key containing a list of wardrobe items).
-- **Returns:** A non-empty string describing outfit combinations and naming the wardrobe pieces used.
+- **Returns:** A non-empty string describing outfit combinations and naming the wardrobe pieces used. 
 - **When it has nothing:** When the `wardrobe['items']` is empty, the model will generate some general styling ideas for the thrifted/new item.
 
 ### `create_fit_card`
@@ -79,7 +79,7 @@ If FitFindr sees no listings match your description, it will communicate that to
 - **What it does:** This tool calls the model to write a short, postable caption (roughly two-to-four setnences) based off the outfit suggestion and the new item.
 - **Inputs:** `outfit` (str from `suggest_outfit`), `new_item` (dict containing a listing).
 - **Returns:** A two-to-four sentence caption that mentions the item, its price, and its platform once each and describes the outfit's vibe.
-- **When it has nothing:** If the `outfit` parameter is empty or contains whitespace, a guardrail will trigger and returns "Cannot create a fit card without an outfit suggestion."
+- **When it has nothing:** If the `outfit` parameter is empty or contains only whitespace, a guardrail will trigger and return "Cannot create a fit card without an outfit suggestion."
 
 ---
 
