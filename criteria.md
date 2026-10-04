@@ -25,9 +25,7 @@ Given a query that matches at least one listing, the agent completes all three
 tool calls and returns a fit card — in at least 4 of 5 tries.
 
 **Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
+I really want a matching query to make it through all three tools and return a fit card. Since two tools call the model, a failed request could stop the process. I feel like 4 of 5 tries sets a strong target while allowing one run to fail.
 
 ---
 
@@ -37,64 +35,52 @@ Given a query that matches no listings, the agent stops before calling
 `suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
 
 **Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
+
+Personally, I feel like the agent should stop every time it finds no listings instead of trying to build an outfit with nothing. This branch only checks an empty list and doesn't rely on the model, so I expect it to work in 5 of 5 tries.
 
 ---
 
-## 3. Something about state
+## 3. Each run keeps its item and outfit connected
 
-<!-- YOU WRITE THIS ONE.
-
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
+Across five pairs of different matching queries, each run passes its selected
+search result to `suggest_outfit`. It then passes the same item and the exact
+outfit suggestion to `create_fit_card`. The second run does not carry over
+the first run's item or outfit. This should work in 5 of 5 pairs.
 
 
-
-**Why this target:**
-
+**Why this target:** Personally, I really want the outfit and caption to match what the user is
+currently asking for. Since the code stores and passes this information
+between tools, I feel like it should work every time without mixing in
+results from a previous run.
 
 
 ---
 
-## 4. Something about the fit card
+## 4. Fit cards are distinct, short, and specific to the find
 
-<!-- YOU WRITE THIS ONE.
-
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
+Across five runs using five different items, at least 4 of 5 fit cards
+have an opening sentence that no other card shares, contain 2 to 4
+sentences, and mention the correct item, price, and platform at least once each.
 
 
-
-**Why this target:**
-
+**Why this target:** I really want each caption to feel specific to the find instead of repeating the same
+opening for different items. It should also include the details someone would
+care about without getting too long. Since the model writes the captions,
+I allow one miss while expecting four cards to meet all these requirements.
 
 
 ---
 
-## 5. Your choice
+## 5. Search stays within budget and responds quickly
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
+Across five searches with a price limit, every returned listing stays at or
+below the budget and each search finishes within one second.
+At least three searches must return matches so empty results alone cannot pass.
 
 **Why this target:**
+I want users to find listings they can afford without having to wait long.
+Since this tool realy only searches 40 local listings and doesn't call the model,
+I feel like both the budget filter and a quick response should work every time.
 
 
 
