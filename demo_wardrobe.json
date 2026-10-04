@@ -1,0 +1,12 @@
+{
+  "items": [
+    {
+      "id": "demo_001",
+      "name": "My red canvas sneakers",
+      "category": "shoes",
+      "colors": ["red", "white"],
+      "style_tags": ["casual", "streetwear"],
+      "notes": "My everyday sneakers"
+    }
+  ]
+}

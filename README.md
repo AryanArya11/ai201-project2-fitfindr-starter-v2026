@@ -350,6 +350,62 @@ This outfit plays with a more relaxed, earth-toned palette while using the sneak
 
 0 model calls this session, 2 served from cache
 ```
+
+
+### Style memory
+
+I added wardrobe memory so users don't have to enter the same clothes every
+time. `--wardrobe` loads a wardrobe file, and `--remember` saves it after a
+successful run. Later runs automatically load the saved wardrobe.
+
+In the first run, I saved a wardrobe containing only my red canvas sneakers.
+In the second run, I asked for a different item without providing a wardrobe
+file. The agent loaded the saved sneakers and used them in the new outfit.
+
+The saved wardrobe stays in `.fitfindr/wardrobe.json`, which is ignored by Git.
+Searching for an item does not automatically add it to the wardrobe.
+
+```
+$ python app.py ask 'vintage graphic tee under $30, size M' --wardrobe demo_wardrobe.json --remember
+(loaded wardrobe from demo_wardrobe.json)
+
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Price (compare_price): This price is below the $24.00 median of 3 similar listings.
+
+  Outfit:   Here is one outfit idea using the Y2K Baby Tee with the butterfly print and the available wardrobe item:
+
+### Outfit: Casual Y2K Streetwear
+
+* **Top:** Y2K Baby Tee — Butterfly Print
+* **Shoes:** My red canvas sneakers
+
+**Why this works:**
+The fitted, cropped silhouette of the baby tee pairs naturally with casual everyday footwear. The red in the canvas sneakers creates a playful, high-contrast pop against the pink and purple tones in the butterfly graphic, leaning into a fun, effortless streetwear vibe.
+
+  Fit card: Scored this adorable Y2K baby tee with the cutest butterfly graphic for just $18. I paired it with my red canvas sneakers to play off the pink and purple tones in the print. It gives off such a fun, effortless streetwear vibe that I am obsessed with, and I found the whole thing on Depop.
+```
+```
+$ python app.py ask '90s track jacket in size M'
+(loaded saved wardrobe: 1 items)
+
+  Found:    90s Track Jacket — Navy/White Stripe — $45.0 on poshmark
+
+  Price (compare_price): This price is above the $42.00 median of 3 similar listings.
+
+  Outfit:   Here is an outfit idea using the new 90s track jacket and your saved wardrobe item:
+
+### Outfit: Retro Streetwear Casual
+* **Outerwear:** 90s Track Jacket — Navy/White Stripe
+* **Shoes:** My red canvas sneakers
+
+**Why these pieces work together:**
+The track jacket's sporty, 90s streetwear aesthetic pairs naturally with your casual canvas sneakers. The navy and white colorway of the jacket provides a classic, neutral base that makes the red in your sneakers pop as a bold, complementary accent color.
+
+  Fit card: Scored this navy and white 90s track jacket for just $45.00 on Poshmark. I paired it with my red canvas sneakers to lean into that retro streetwear casual vibe. It's the ultimate lightweight layer for running errands while still looking put together.
+
+2 model calls this session, 612 prompt + 173 output tokens
+```
 ---
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════

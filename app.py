@@ -138,27 +138,48 @@ def _ask_one(query, wardrobe, use_trace):
 
 
 def cmd_ask(args):
+    from pathlib import Path
     from utils.data_loader import get_example_wardrobe, get_empty_wardrobe
+    from wardrobe_memory import MEMORY_FILE, load_wardrobe, save_wardrobe
     import generate
-
-    wardrobe = get_empty_wardrobe() if args.empty_wardrobe else get_example_wardrobe()
+    
     if args.empty_wardrobe:
+        wardrobe = get_empty_wardrobe()
         print("(running with an empty wardrobe)")
+    elif args.wardrobe:
+        wardrobe = load_wardrobe(Path(args.wardrobe))
+        print(f"(loaded wardrobe from {args.wardrobe})")
+    elif MEMORY_FILE.exists():
+        wardrobe = load_wardrobe(MEMORY_FILE)
+        print(f"(loaded saved wardrobe: {len(wardrobe['items'])} items)")
+    else:
+        wardrobe = get_example_wardrobe()
+        print("(using example wardrobe; no saved wardrobe yet)")
+
+    def ask(query):
+        session = _ask_one(query, wardrobe, args.trace)
+
+        if args.remember and not session["error"]:
+            save_wardrobe(wardrobe)
+            print(f"(saved wardrobe: {len(wardrobe['items'])} items)")
 
     try:
         if args.query:
-            _ask_one(args.query, wardrobe, args.trace)
+            ask(args.query)
         else:
             print("Ask for something, or press Enter on an empty line to quit.\n")
+
             while True:
                 try:
                     query = input("> ").strip()
                 except (EOFError, KeyboardInterrupt):
                     print()
                     break
+
                 if not query:
                     break
-                _ask_one(query, wardrobe, args.trace)
+
+                ask(query)
     finally:
         print(generate.usage())
 
@@ -186,10 +207,21 @@ def build_parser():
     p_ask = sub.add_parser("ask", help="run the agent")
     p_ask.add_argument("query", nargs="?")
     p_ask.add_argument("--trace", action="store_true", help="print the loop step by step")
-    p_ask.add_argument(
+    wardrobe_source = p_ask.add_mutually_exclusive_group()
+
+    wardrobe_source.add_argument(
+        "--wardrobe",
+        help="load a wardrobe JSON file",
+    )
+    wardrobe_source.add_argument(
         "--empty-wardrobe",
         action="store_true",
-        help="run as a user with nothing saved — one of unit 4's failure modes",
+        help="temporarily use an empty wardrobe",
+    )
+    p_ask.add_argument(
+        "--remember",
+        action="store_true",
+        help="save this wardrobe after a successful run",
     )
     p_ask.set_defaults(func=cmd_ask)
 
