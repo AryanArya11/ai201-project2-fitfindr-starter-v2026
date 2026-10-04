@@ -240,15 +240,15 @@ Cannot create a fit card without an outfit suggestion.
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- **What I asked for:** I asked Claude to help me understand how the three tools connected and how information moved between them.
+- **What came back:** It gave me a top-down explanation of how the search finds an item, the outfit tool pairs it with wardrobe pieces, and the caption tool uses both to create a fit card.
+- **What I changed:** I used that explanation to write the Tool Inventory in my own language and clarify what each tool receives and returns.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- **What I asked for:** I asked ChatGPT to help me understand what made the planning loop an agent instead of just three tool calls in a row.
+- **What came back:** It explained how the search result decides what happens next. If nothing matches, the agent stops. If something matches, it passes the selected item to the next tool.
+- **What I changed:** I used that explanation to write the branch rule in my README. I also tested both paths because I really wanted to see that the agent stopped when there was nothing to work with.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
