@@ -48,6 +48,7 @@ def new_session(query: str, wardrobe: dict) -> dict:
 
 
 # ── planning loop ─────────────────────────────────────────────────────────────
+import re
 
 def run_agent(query: str, wardrobe: dict) -> dict:
     """
@@ -106,11 +107,83 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         than a stack trace. The import is already at the top of this file.
     """
     session = new_session(query, wardrobe)
+    
+    # Pull the budget and size out of the query.
+    description = query.strip()
+    max_price = None
+    size = None
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
-    return session
+    price_pattern = (
+        r"\b(?:under|up to|max(?:imum)?(?: price)?)"
+        r"\s*\$?\s*(\d+(?:\.\d+)?)"
+    )
+    price_match = re.search(price_pattern, description, re.IGNORECASE)
 
+    if price_match:
+        max_price = float(price_match.group(1))
+        description = re.sub(
+            price_pattern, "", description, flags=re.IGNORECASE
+        )
+
+    size_pattern = r"\bsize\s+(\w+(?:[/.]\w+)*(?:\s+L\d+)?)"
+    size_match = re.search(size_pattern, description, re.IGNORECASE)
+
+    if size_match:
+        size = size_match.group(1)
+        description = re.sub(
+            size_pattern, "", description, flags=re.IGNORECASE
+        )
+
+    description = re.sub(
+        r"^\s*(?:looking for|find me|find)\s+",
+        "",
+        description,
+        flags=re.IGNORECASE,
+    )
+    description = " ".join(description.replace(",", " ").split())
+
+    session["parsed"] = {
+        "description": description,
+        "size": size,
+        "max_price": max_price,
+    }
+
+    # Each step decides what happens next.
+    step = "search"
+    count = 0
+
+    while True:
+        count += 1
+        trace.check_iterations(count)
+
+        if step == "search":
+            session["search_results"] = search_listings(
+                **session["parsed"]
+            )
+
+            if not session["search_results"]:
+                session["error"] = (
+                    "No listings matched. Try different description keywords, "
+                    "a different size, or a higher budget."
+                )
+                return session
+
+            session["selected_item"] = session["search_results"][0]
+            step = "outfit"
+
+        elif step == "outfit":
+            session["outfit_suggestion"] = suggest_outfit(
+                session["selected_item"],
+                session["wardrobe"],
+            )
+            step = "caption"
+
+        elif step == "caption":
+            session["fit_card"] = create_fit_card(
+                session["outfit_suggestion"],
+                session["selected_item"],
+            )
+            return session
 
 # ── running it directly ───────────────────────────────────────────────────────
 

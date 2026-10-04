@@ -96,13 +96,15 @@ If FitFindr sees no listings match your description, it will communicate that to
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If `search_listings()` returns an empty list, then the agent saves a message explaining what the user could change and stops. Otherwise, it selects the first result, suggests an outfit, and creats a fit card.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** I used regex to pull the size and maximum price
+out of the query. The remaining description becomes the keywords for searching.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** 
+The way this works is that each query gets its own session so results from previous runs don't get mixed in. The agent saves the search inputs in `parsed` and the matching listings in `search_results`. It stores the first match in `selected_item` and passes it with the wardrobe to `suggest_outfit`. Then it passes the returned `outfit_suggestion` and that same item to `create_fit_card`, saving the caption in `fit_card`. If nothing matches, it saves a message in `error` and stops.
 
 ---
 
@@ -116,7 +118,39 @@ If FitFindr sees no listings match your description, it will communicate that to
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30, size M'
+
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   Here are two outfit ideas featuring the **Y2K Baby Tee — Butterfly Print**:
+
+### Outfit 1: Y2K Streetwear Contrast
+* **New Item:** Y2K Baby Tee — Butterfly Print
+* **Wardrobe Pieces Used:** 
+  * Baggy straight-leg jeans, dark wash (w_001)
+  * Vintage black denim jacket (w_006)
+  * Chunky white sneakers (w_007)
+  * Black crossbody bag (w_010)
+
+**Why it works:** 
+This look plays on classic early 2000s proportions by pairing the fitted, cropped silhouette of the baby tee with the relaxed, high-waisted fit of the dark wash baggy jeans. Throwing on the slightly cropped black denim jacket and chunky white sneakers ties the streetwear vibe together while letting the pink and purple butterfly graphic pop against the dark denim.
+
+---
+
+### Outfit 2: Casual Earth-Tone Mix
+* **New Item:** Y2K Baby Tee — Butterfly Print
+* **Wardrobe Pieces Used:** 
+  * Wide-leg khaki trousers (w_002)
+  * Black combat boots (w_008)
+  * Brown leather belt (w_009)
+  * Black crossbody bag (w_010)
+
+**Why it works:**
+This outfit balances casual Y2K nostalgia with a grounded, minimalist aesthetic. Tucking the fitted baby tee into the wide-leg khaki trousers (cinched with the brown leather belt) creates a flattering silhouette. Adding the black combat boots and black crossbody bag introduces an edgy contrast that keeps the look grounded and effortless.
+
+  Fit card: Scored this Y2K butterfly print baby tee for just $18 on depop and it is honestly the cutest piece. I styled it with baggy denim and chunky sneakers to lean into that classic early 2000s streetwear vibe.
+
+0 model calls this session, 2 served from cache
 
 ```
 
@@ -124,17 +158,73 @@ $ python app.py ask '...'
 
 ```
 $ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
+[{'id': 'lst_002', 'title': 'Y2K Baby Tee — Butterfly Print', 'description': 'Super cute early 2000s baby tee with butterfly graphic. Fitted crop length. Tag says medium but fits like a small.', 'category': 'tops', 'style_tags': ['y2k', 'vintage', 'graphic tee', 'cottagecore'], 'size': 'S/M', 'condition': 'excellent', 'price': 18.0, 'colors': ['white', 'pink', 'purple'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_006', 'title': 'Graphic Tee — 2003 Tour Bootleg Style', 'description': 'Vintage-style bootleg tee with faded graphic. Slightly boxy fit. 100% cotton, soft and worn-in.', 'category': 'tops', 'style_tags': ['graphic tee', 'vintage', 'grunge', 'streetwear', 'band tee'], 'size': 'L', 'condition': 'good', 'price': 24.0, 'colors': ['black'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_017', 'title': 'Mesh Long-Sleeve Top — Black', 'description': 'Sheer black mesh long-sleeve. Great for layering under a graphic tee or over a bralette. Stretchy material, fits true to size.', 'category': 'tops', 'style_tags': ['y2k', 'grunge', 'goth', 'layering'], 'size': 'S/M', 'condition': 'excellent', 'price': 15.0, 'colors': ['black'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_033', 'title': 'Vintage Band Tee — Faded Grey', 'description': 'Faded grey band-style tee with distressed graphic. Crew neck. Fits boxy. Well-loved but no holes or major damage.', 'category': 'tops', 'style_tags': ['vintage', 'grunge', 'band tee', 'graphic tee', 'streetwear'], 'size': 'L', 'condition': 'fair', 'price': 19.0, 'colors': ['grey', 'charcoal'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_011', 'title': 'Low-Rise Cargo Pants — Khaki', 'description': 'Y2K era low-rise cargo pants. Lots of pockets. Khaki color, slightly distressed at the hems. Great for layering with a long tee.', 'category': 'bottoms', 'style_tags': ['y2k', 'cargo', '2000s', 'streetwear'], 'size': 'W29', 'condition': 'fair', 'price': 27.0, 'colors': ['khaki', 'tan'], 'brand': None, 'platform': 'poshmark'}, {'id': 'lst_015', 'title': 'Vintage Graphic Hoodie — Faded Black', 'description': 'Faded black pullover hoodie with barely-visible vintage graphic on the chest. Cozy interior. Some pilling but adds to the worn-in look.', 'category': 'tops', 'style_tags': ['vintage', 'grunge', 'graphic', 'streetwear'], 'size': 'L', 'condition': 'fair', 'price': 26.0, 'colors': ['black', 'charcoal'], 'brand': None, 'platform': 'depop'}]
+```
 
+```text
+$ python -c "from tools import search_listings; results = search_listings('graphic tee', size='M', max_price=30); print([(item['title'], item['size'], item['price']) for item in results])"
+[('Y2K Baby Tee — Butterfly Print', 'S/M', 18.0), ('Mesh Long-Sleeve Top — Black', 'S/M', 15.0)]
+```
+
+```text
+$ python -c "from tools import search_listings; print(search_listings('designer ballgown', size='XXS', max_price=5))"
+[]
+```
+
+
+```
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
+
+
+Here are two outfits featuring the Vintage Levi's 501 Jeans and pieces from your saved wardrobe:
+
+### Outfit 1: Effortless Casual Streetwear
+* **Bottoms:** Vintage Levi's 501 Jeans (New Item)
+* **Top:** White ribbed tank top (`w_003`)
+* **Outerwear:** Oversized grey crewneck sweatshirt (`w_004`)
+* **Shoes:** Chunky white sneakers (`w_007`)
+* **Accessories:** Black crossbody bag (`w_010`)
+
+**Why it works:** 
+This look leans into a relaxed, everyday streetwear aesthetic. The fitted white ribbed tank top provides a clean, minimal base that balances the relaxed straight-leg fit of the 501s. Tossing the oversized grey crewneck over top creates a comfortable, textured silhouette, while the chunky white sneakers and black crossbody bag tie the casual, classic color palette together.
+
+---
+
+### Outfit 2: Edgy Vintage Mix
+* **Bottoms:** Vintage Levi's 501 Jeans (New Item)
+* **Top:** Black cropped zip hoodie (`w_005`)
+* **Outerwear:** Vintage black denim jacket (`w_006`)
+* **Shoes:** Black combat boots (`w_008`)
+* **Accessories:** Brown leather belt (`w_009`)
+
+**Why it works:**
+This outfit plays with contrasting denim washes and textures for a sharper, grungier edge. The medium wash of the Levi's stands out sharply against the black outerwear, cropped hoodie, and combat boots. Adding the brown leather belt introduces a nice earth-tone accent that breaks upthe black-and-blue combination while highlighting the vintage character of the jeans.
 ```
 
 ```
-$ python -c "from tools import suggest_outfit; ..."
+python -c "from tools import suggest_outfit; from utils.data_loader import load_listings; print(suggest_outfit(load_listings()[0], {'items': []}))"
+Here are two outfit ideas featuring the Vintage Levi's 501 Jeans, styled with pieces you could easily add to your wardrobe.
 
+### Outfit 1: Casual Streetwear
+*   **The Look:** Relaxed, effortless, and everyday-ready.
+*   **Suggested Piece to Pair:** A crisp, oversized white graphic t-shirt (tucked in loosely) and a pair of classic canvas sneakers like white Converse Lows or Adidas Sambas.
+*   **Why it works:** The medium wash of the Levi's pairs naturally with stark white for a clean contrast. The casual fit of a graphic tee complements the laid-back, vintage aesthetic of the 501s without trying too hard. 
+
+### Outfit 2: Elevated Vintage
+*   **The Look:** Smart-casual with a timeless, textural mix.
+*   **Suggested Piece to Pair:** A black fitted ribbed tank top layered under an oversized black-and-white houndstooth blazer, finished with black leather loafers or chunky ankle boots.
+*   **Why it works:** Pairing structured, slightly formal pieces like a blazer and leather shoes with the faded knees and relaxed straight-leg cut of the vintage denim creates a great high-low balance.
 ```
 
 ```
-$ python -c "from tools import create_fit_card; ..."
+$ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
 
+Scored these classic vintage Levi's 501 jeans on depop for just $38. Pairing them with crisp white sneakers gives off the ultimate effortlessstreetwear vibe. It is safe to say these are going to be on heavy rotation from now on.
+```
+
+```
+python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('   ', load_listings()[0]))"
+Cannot create a fit card without an outfit suggestion.
 ```
 
 ---
