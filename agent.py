@@ -15,7 +15,7 @@ Build and test your three tools in `tools.py` first. Then come here.
 
 import config
 import trace
-from tools import search_listings, suggest_outfit, create_fit_card
+from tools import search_listings, suggest_outfit, create_fit_card, compare_price
 from generate import ModelUnavailable
 
 
@@ -44,6 +44,8 @@ def new_session(query: str, wardrobe: dict) -> dict:
         "outfit_suggestion": None,   # what suggest_outfit returned
         "fit_card": None,            # what create_fit_card returned
         "error": None,               # set when the run ended early
+        "price_comparison": None,    # what compare_price returned
+        "price_message": None,       # a readable message about the price comparison
     }
 
 
@@ -107,7 +109,7 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         than a stack trace. The import is already at the top of this file.
     """
     session = new_session(query, wardrobe)
-    
+
     # Pull the budget and size out of the query.
     description = query.strip()
     max_price = None
@@ -169,6 +171,24 @@ def run_agent(query: str, wardrobe: dict) -> dict:
                 return session
 
             session["selected_item"] = session["search_results"][0]
+            step = "compare_price"
+
+        elif step == "compare_price":
+            comparison = compare_price(session["selected_item"])
+            session["price_comparison"] = comparison
+
+            if comparison["median_price"] is None:
+                session["price_message"] = (
+                    "Not enough similar listings to compare prices. "
+                    "At least two are needed."
+                )
+            else:
+                session["price_message"] = (
+                    f"This price is {comparison['relationship']} the "
+                    f"${comparison['median_price']:.2f} median of "
+                    f"{len(comparison['comparable_ids'])} similar listings."
+                )
+
             step = "outfit"
 
         elif step == "outfit":
@@ -197,6 +217,7 @@ def _show(session: dict) -> None:
     print(f"  found:    {item.get('title')} — ${item.get('price')} on {item.get('platform')}")
     print(f"  outfit:   {session['outfit_suggestion']}")
     print(f"  fit card: {session['fit_card']}")
+    print(f"  price (compare_price): {session['price_message']}")
 
 
 if __name__ == "__main__":

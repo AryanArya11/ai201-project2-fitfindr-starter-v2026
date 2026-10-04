@@ -81,6 +81,14 @@ If FitFindr sees no listings match your description, it will communicate that to
 - **Returns:** A two-to-four sentence caption that mentions the item, its price, and its platform once each and describes the outfit's vibe.
 - **When it has nothing:** If the `outfit` parameter is empty or contains only whitespace, a guardrail will trigger and return "Cannot create a fit card without an outfit suggestion."
 
+
+### `compare_price`
+
+- **What it does:** Compares the selected item's price with other listings in the same category that share at least two style tags.
+- **Inputs:** `new_item` (listing dict).
+- **Returns:** A dict with `comparable_ids` (list of listing IDs), `median_price` (float or None), and `relationship` (str).
+- **When it has nothing:** If fewer than two similar listings exist, returns None for the median and "insufficient_data" for the relationship.
+
 ---
 
 ## Planning Loop
@@ -231,13 +239,6 @@ Cannot create a fit card without an outfit suggestion.
 
 ## How I Used AI
 
-<!-- Two specific moments. What you asked, what came back, what you changed.
-
-     "I used Claude to help me code" is not enough.
-
-     "I gave Claude my search_listings spec. It returned None on no match
-     instead of an empty list, so I changed it" is the level we want. -->
-
 **Moment 1**
 
 - **What I asked for:** I asked Claude to help me understand how the three tools connected and how information moved between them.
@@ -249,6 +250,107 @@ Cannot create a fit card without an outfit suggestion.
 - **What I asked for:** I asked ChatGPT to help me understand what made the planning loop an agent instead of just three tool calls in a row.
 - **What came back:** It explained how the search result decides what happens next. If nothing matches, the agent stops. If something matches, it passes the selected item to the next tool.
 - **What I changed:** I used that explanation to write the branch rule in my README. I also tested both paths because I really wanted to see that the agent stopped when there was nothing to work with.
+
+---
+
+---
+## Stretch Features
+
+- **Fourth tool:** I want to add `compare_price` so users can see how the item's price compares to similar listings.
+- **Second branch:** If there aren't enough similar listings, the agent will let the user know. Otherwise, it will show the price comparison. Either way, it will still suggest an outfit and create a caption.
+- **Style memory:** I really want users to be able to save their wardrobe so they don't have to enter the same clothes every time they use FitFindr.
+
+
+### What the price comparison changed
+
+The agent now calls `compare_price` after selecting an item. It saves the
+result in `price_comparison` and the explanation in `price_message`.
+
+The second branch is in `agent.py::run_agent`. If the median is `None`,
+the agent explains that there aren't enough similar listings. Otherwise,
+it shows whether the price is below, above, or equal to the median.
+Both paths continue to the outfit and caption.
+
+This comparison uses the local dataset, so it isn't a live market valuation.
+
+### Price comparison run
+
+```text
+$ python app.py ask 'vintage graphic tee under $30, size M'
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Price (compare_price): This price is below the $24.00 median of 3 similar listings.
+
+  Outfit:   Here are two outfit ideas featuring the **Y2K Baby Tee — Butterfly Print**:
+
+### Outfit 1: Y2K Streetwear Contrast
+* **New Item:** Y2K Baby Tee — Butterfly Print
+* **Wardrobe Pieces Used:** 
+  * Baggy straight-leg jeans, dark wash (w_001)
+  * Vintage black denim jacket (w_006)
+  * Chunky white sneakers (w_007)
+  * Black crossbody bag (w_010)
+
+**Why it works:** 
+This look plays on classic early 2000s proportions by pairing the fitted, cropped silhouette of the baby tee with the relaxed, high-waisted fit of the dark wash baggy jeans. Throwing on the slightly cropped black denim jacket and chunky white sneakers ties the streetwear vibe together while letting the pink and purple butterfly graphic pop against the dark denim.
+
+---
+
+### Outfit 2: Casual Earth-Tone Mix
+* **New Item:** Y2K Baby Tee — Butterfly Print
+* **Wardrobe Pieces Used:** 
+  * Wide-leg khaki trousers (w_002)
+  * Black combat boots (w_008)
+  * Brown leather belt (w_009)
+  * Black crossbody bag (w_010)
+
+**Why it works:**
+This outfit balances casual Y2K nostalgia with a grounded, minimalist aesthetic. Tucking the fitted baby tee into the wide-leg khaki trousers(cinched with the brown leather belt) creates a flattering silhouette. Adding the black combat boots and black crossbody bag introduces an edgy contrast that keeps the look grounded and effortless.
+
+  Fit card: Scored this Y2K butterfly print baby tee for just $18 on depop and it is honestly the cutest piece. I styled it with baggy denim and chunky sneakers to lean into that classic early 2000s streetwear vibe.
+
+0 model calls this session, 2 served from cache
+```
+
+### Not enough similar listings
+
+```text
+$ python app.py ask 'platform sneakers size 8'
+  Found:    Platform Sneakers — White Chunky Sole — $48.0 on poshmark
+
+  Price (compare_price): Not enough similar listings to compare prices. At least two are needed.
+
+  Outfit:   Here are two outfits using the **Platform Sneakers — White Chunky Sole** and pieces from your saved wardrobe:
+
+### Outfit 1: Y2K Streetwear Casual
+* **New Item:** Platform Sneakers — White Chunky Sole
+* **Wardrobe Pieces:** 
+  * Baggy straight-leg jeans, dark wash (w_001)
+  * White ribbed tank top (w_003)
+  * Black cropped zip hoodie (w_005)
+  * Black crossbody bag (w_010)
+
+**Why this works:** 
+This look leans entirely into the late 90s/early 2000s streetwear aesthetic of the sneakers. Pairing the fitted white tank top with the baggydark-wash jeans creates a classic, balanced silhouette. Layering the black cropped zip hoodie on top keeps the proportions short at the waist, allowing the chunky platform sole and baggy hem to take center stage. Finished with the black crossbody bag, it’s an effortless, cohesive everyday fit.
+
+---
+
+### Outfit 2: Contrast Casual 
+* **New Item:** Platform Sneakers — White Chunky Sole
+* **Wardrobe Pieces:** 
+  * Wide-leg khaki trousers (w_002)
+  * Oversized grey crewneck sweatshirt (w_004)
+  * Brown leather belt (w_009)
+  * Black crossbody bag (w_010)
+
+**Why this works:**
+This outfit plays with a more relaxed, earth-toned palette while using the sneakers to add a crisp, sporty anchor to the bottom. Tucking the oversized grey crewneck into the wide-leg khaki trousers (accented by the brown leather belt) gives the look some intentional structure. The bright white platform sole ties in with the casual vibe, keeping the voluminous wide-leg trousers from looking weighed down.
+
+  Fit card: Scored these chunky white platform sneakers with Velcro straps just in time to lean into a late 90s and early 2000s streetwear aesthetic. I found them on Poshmark for $48, and they add the ultimate retro edge to any casual fit.
+
+0 model calls this session, 2 served from cache
+```
+---
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 

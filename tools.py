@@ -256,3 +256,44 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
         raise ValueError("The model returned no fit card.")
 
     return response
+
+
+# ── Stretch Feature -> Tool 4: compare_price ───────────────────────────────────────────────────
+
+def compare_price(new_item: dict) -> dict:
+    """Compare the item's price with similar listings in the dataset."""
+    from statistics import median
+
+    similar_items = []
+
+    for item in load_listings():
+        same_category = item["category"] == new_item["category"]
+        shared_tags = set(item["style_tags"]) & set(new_item["style_tags"])
+
+        if (
+            item["id"] != new_item["id"]
+            and same_category
+            and len(shared_tags) >= 2
+        ):
+            similar_items.append(item)
+
+    result = {
+        "comparable_ids": [item["id"] for item in similar_items],
+        "median_price": None,
+        "relationship": "insufficient_data",
+    }
+
+    if len(similar_items) < 2:
+        return result
+
+    median_price = float(median(item["price"] for item in similar_items))
+    result["median_price"] = median_price
+
+    if new_item["price"] < median_price:
+        result["relationship"] = "below"
+    elif new_item["price"] > median_price:
+        result["relationship"] = "above"
+    else:
+        result["relationship"] = "equal to"
+
+    return result
