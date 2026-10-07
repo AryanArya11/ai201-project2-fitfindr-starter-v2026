@@ -384,6 +384,9 @@ $ python app.py ask 'vintage graphic tee under $30, size M' --wardrobe demo_ward
 The fitted, cropped silhouette of the baby tee pairs naturally with casual everyday footwear. The red in the canvas sneakers creates a playful, high-contrast pop against the pink and purple tones in the butterfly graphic, leaning into a fun, effortless streetwear vibe.
 
   Fit card: Scored this adorable Y2K baby tee with the cutest butterfly graphic for just $18. I paired it with my red canvas sneakers to play off the pink and purple tones in the print. It gives off such a fun, effortless streetwear vibe that I am obsessed with, and I found the whole thing on Depop.
+
+(saved wardrobe: 1 items)
+2 model calls this session, 618 prompt + 177 output tokens
 ```
 ```
 $ python app.py ask '90s track jacket in size M'
@@ -412,6 +415,23 @@ The track jacket's sporty, 90s streetwear aesthetic pairs naturally with your ca
 
      Don't fill these in during unit 3.
      ═══════════════════════════════════════════════════════════════════ -->
+
+---
+
+### Milestone 1: Move one tool onto MCP
+
+I registered `search_listings` in `mcp_server.py` and changed
+`agent.py::run_agent` to use `mcp_client.call_tool` instead of calling the
+search function directly. It still returns the same listing dictionaries,
+so I didn't need to change how the rest of the loop uses them.
+
+I checked that the server showed the tool and its inputs. Then I tried a
+matching query, which returned a listing, outfit, and fit card. I also tried
+an impossible query, and the agent stopped with suggestions on what to
+change without making any model calls.
+
+---
+
 
 ---
 
