@@ -154,59 +154,101 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     # Each step decides what happens next.
     step = "search"
     count = 0
+    try:
+        while True:
+            count += 1
+            trace.check_iterations(count)
 
-    while True:
-        count += 1
-        trace.check_iterations(count)
-
-        if step == "search":
-            session["search_results"] = call_tool(
-                "search_listings",
-                session["parsed"],
-            )
-
-            if not session["search_results"]:
-                session["error"] = (
-                    "No listings matched. Try different description keywords, "
-                    "a different size, or a higher budget."
+            if step == "search":
+                session["search_results"] = call_tool(
+                    "search_listings",
+                    session["parsed"],
                 )
+                trace.step(
+                    "search_listings (via MCP)",
+                    inputs=session["parsed"],
+                    returned=session["search_results"],
+                    note=(
+                        "branch: empty search, stopping"
+                        if not session["search_results"]
+                        else "branch: matches found, continuing to price comparison"
+                    ),)
+
+                if not session["search_results"]:
+                    session["error"] = (
+                        "No listings matched. Try different description keywords, "
+                        "a different size, or a higher budget."
+                    )
+                    return session
+
+                session["selected_item"] = session["search_results"][0]
+                step = "compare_price"
+
+            elif step == "compare_price":
+                comparison = compare_price(session["selected_item"])
+                session["price_comparison"] = comparison
+
+                if comparison["median_price"] is None:
+                    session["price_message"] = (
+                        "Not enough similar listings to compare prices. "
+                        "At least two are needed."
+                    )
+                else:
+                    session["price_message"] = (
+                        f"This price is {comparison['relationship']} the "
+                        f"${comparison['median_price']:.2f} median of "
+                        f"{len(comparison['comparable_ids'])} similar listings."
+                    )
+                trace.step(
+                    "compare_price",
+                    inputs=session["selected_item"],
+                    returned=session["price_comparison"],
+                    note=session["price_message"],
+                )
+                step = "outfit"
+
+            elif step == "outfit":
+                session["outfit_suggestion"] = suggest_outfit(
+                    session["selected_item"],
+                    session["wardrobe"],
+                )
+                trace.step(
+                    "suggest_outfit",
+                    inputs={
+                        "new_item": session["selected_item"],
+                        "wardrobe": session["wardrobe"],
+                    },
+                    returned=session["outfit_suggestion"],
+                )
+                step = "caption"
+
+            elif step == "caption":
+                session["fit_card"] = create_fit_card(
+                    session["outfit_suggestion"],
+                    session["selected_item"],
+                )
+                trace.step(
+                    "create_fit_card",
+                    inputs={
+                        "outfit": session["outfit_suggestion"],
+                        "new_item": session["selected_item"],
+                    },
+                    returned=session["fit_card"],
+                )
+        
                 return session
-
-            session["selected_item"] = session["search_results"][0]
-            step = "compare_price"
-
-        elif step == "compare_price":
-            comparison = compare_price(session["selected_item"])
-            session["price_comparison"] = comparison
-
-            if comparison["median_price"] is None:
-                session["price_message"] = (
-                    "Not enough similar listings to compare prices. "
-                    "At least two are needed."
-                )
-            else:
-                session["price_message"] = (
-                    f"This price is {comparison['relationship']} the "
-                    f"${comparison['median_price']:.2f} median of "
-                    f"{len(comparison['comparable_ids'])} similar listings."
-                )
-
-            step = "outfit"
-
-        elif step == "outfit":
-            session["outfit_suggestion"] = suggest_outfit(
-                session["selected_item"],
-                session["wardrobe"],
-            )
-            step = "caption"
-
-        elif step == "caption":
-            session["fit_card"] = create_fit_card(
-                session["outfit_suggestion"],
-                session["selected_item"],
-            )
-            return session
-
+    
+    
+    except ModelUnavailable as exc:
+        session["error"] = (
+            f"Couldn't finish the {step} step. {exc}"
+        )
+        trace.step(
+            "model unavailable",
+            inputs={"step": step},
+            note=session["error"],
+        )
+        return session
 # ── running it directly ───────────────────────────────────────────────────────
 
 def _show(session: dict) -> None:

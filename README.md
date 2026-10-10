@@ -510,19 +510,83 @@ that produced it:
 **Happy path**
 
 ```
+$ python app.py ask 'vintage graphic tee under $30, size M' --trace
+
+(running with an empty wardrobe)
+[1] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 5 items: 90s Track Jacket — Navy/White Stripe, Y2K Baby Tee — Butterfly Print, Vintage Linen Blazer — Cream … +2 more
+      →    branch: matches found, continuing to price comparison
+[2] compare_price
+      in:  90s Track Jacket — Navy/White Stripe ($45.0, poshmark)
+      out: dict with keys: comparable_ids, median_price, relationship
+      →    This price is above the $42.00 median of 3 similar listings.
+[3] model unavailable
+      in:  dict with keys: step
+      →    Couldn't finish the outfit step. The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.
+
+  Couldn't finish the outfit step. The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.
+
+1 model calls this session                                       python app.py ask 'navy white track jacket under $47, size M' --empty-wardrobe --trace01-project2-fitfindr-starter-v2026> 
+(running with an empty wardrobe)
+[1] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 5 items: 90s Track Jacket — Navy/White Stripe, Y2K Baby Tee — Butterfly Print, Vintage Linen Blazer — Cream … +2 more
+      →    branch: matches found, continuing to price comparison
+[2] compare_price
+      in:  90s Track Jacket — Navy/White Stripe ($45.0, poshmark)
+      out: dict with keys: comparable_ids, median_price, relationship
+      →    This price is above the $42.00 median of 3 similar listings.
+[3] suggest_outfit
+      in:  dict with keys: new_item, wardrobe
+      out: Here are two outfit ideas featuring the **90s Track Jacket — Navy/White Stripe**.  ### Outfit 1: Off-Duty Stre…
+[4] create_fit_card
+      in:  dict with keys: outfit, new_item
+      out: Scored this navy and white 90s track jacket on Poshmark for just $45, and it’s the ultimate layering piece for…
+
+  Found:    90s Track Jacket — Navy/White Stripe — $45.0 on poshmark
+
+  Price (compare_price): This price is above the $42.00 median of 3 similar listings.
+
+  Outfit:   Here are two outfit ideas featuring the **90s Track Jacket — Navy/White Stripe**.
+
+### Outfit 1: Off-Duty Streetwear
+* **The Look:** Effortless, retro-casual daily wear.
+* **Pair with:** A pair of light-wash, high-rise baggy denim jeans and a simple white cropped t-shirt. Finish the look with classic retro sneakers (like Reebok Club C or Nike Cortez) and a minimalist canvas tote.
+* **Why it works:** The navy and white stripes of the track jacket pair naturally with classic denim. Layering it open over a white tee keeps the look relaxed, while the baggy silhouette of the jeans leans into the authentic 90s aesthetic of the jacket.
+
+### Outfit 2: Elevated Athleisure
+* **The Look:** Sporty, comfortable, and put-together for running errands or casual hangouts.
+* **Pair with:** Mid-rise grey fleece sweatpants or ribbed biker shorts, layered over a fitted black bodysuit. Add chunky lifestyle sneakers and a baseball cap.
+* **Why it works:** Mixing navy blue with grey creates a clean, classic athletic color palette. Zipping the track jacket halfway or all the way up creates a sharp, cohesive athleisure silhouette that balances comfort with vintage streetwear style.
+
+  Fit card: Scored this navy and white 90s track jacket on Poshmark for just $45, and it’s the ultimate layering piece for an effortless, retro-casual daily wear look. I love pairing it with light-wash denim and a simple white tee to lean right into that authentic vintage streetwear vibe.
+
+2 model calls this session, 713 prompt + 331 output tokens
 
 ```
+
 
 **Empty search**
+```
+$ python app.py ask 'designer ballgown size XXS under $5' --trace
+(using example wardrobe; no saved wardrobe yet)
+[1] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+      →    branch: empty search, stopping
 
+  No listings matched. Try different description keywords, a different size, or a higher budget.
+
+0 model calls this session
 ```
 
-```
-
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+**On the MCP move:** I changed the search step in `agent.py` to use
+`mcp_client.call_tool` instead of calling `search_listings` directly.
+The server calls my existing search function and sends the results back.
+My loop still uses those results the same way, and the trace now shows
+that the search went through MCP. The matching query continued through
+all four tools, while the empty search stopped after the first tool.
 
 
 
