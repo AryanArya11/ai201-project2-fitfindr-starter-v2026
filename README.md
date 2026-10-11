@@ -933,6 +933,17 @@ what else could be improved. I stopped here to keep this milestone focused
 on one change and measure its effect clearly.
 
 
+### Unit 4: Investigating search speed
+
+- **What I asked for:** I asked Claude whether starting a new MCP server for
+  every search could explain why my speed criterion was failing.
+- **What came back:** It explained the connection process and helped me
+  measure setup separately from the tool call. The measurements showed
+  that startup and initialization took most of the time.
+- **What I changed:** I updated the client to reuse one connection and ran
+  the full evaluation again. Repeated searches became much faster, but
+  I also documented that the first search could still exceed one second.
+
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
