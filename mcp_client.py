@@ -30,6 +30,12 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from time import perf_counter
+
+import atexit
+from concurrent.futures import Future
+from queue import Queue, Empty
+from threading import Thread
 
 SERVER = Path(__file__).parent / "mcp_server.py"
 
@@ -38,64 +44,134 @@ class MCPError(RuntimeError):
     """The server couldn't be reached, or it refused the call."""
 
 
-def call_tool(name: str, arguments: dict):
-    """
-    Call one tool on your MCP server and return what it returns.
+class MCPConnection:
+    """One worker that keeps an MCP connection open between calls."""
 
-    Args:
-        name:      the tool name, exactly as registered in mcp_server.py.
-        arguments: a dict of the tool's inputs. The names and types have to
-                   match the registration — that's your Tool Inventory, now
-                   being enforced by something other than you.
+    def __init__(self):
+        self.requests = Queue()
+        self.failure = None
+        self.thread = Thread(target=self._run, daemon=True)
+        self.thread.start()
 
-    Returns:
-        Whatever the tool returns, unwrapped back to its native Python shape.
-        A tool returning a list of dicts gives you a list of dicts.
+    def _run(self):
+        try:
+            asyncio.run(self._serve())
+        except Exception as exc:
+            self.failure = MCPError(f"MCP connection failed: {exc}")
 
-    Raises:
-        MCPError, with something readable in it.
-    """
-    try:
-        return asyncio.run(_call(name, arguments))
-    except MCPError:
-        raise
-    except Exception as exc:  # noqa: BLE001 — re-raised readably below
-        raise MCPError(
-            f"Couldn't call '{name}' over MCP: {exc}\n"
-            f"Check that mcp_server.py runs on its own first:\n"
-            f"    python mcp_server.py\n"
-            f"If it exits immediately with an error, fix that before coming back here."
-        ) from exc
+            # Release any caller waiting for a response.
+            while True:
+                try:
+                    request = self.requests.get_nowait()
+                except Empty:
+                    break
 
+                if request is not None:
+                    _, _, future = request
+                    future.set_exception(self.failure)
 
-async def _call(name: str, arguments: dict):
-    from mcp import ClientSession, StdioServerParameters
-    from mcp.client.stdio import stdio_client
+    async def _serve(self):
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
 
-    params = StdioServerParameters(
-        command=sys.executable,
-        args=[str(SERVER)],
-    )
+        params = StdioServerParameters(
+            command=sys.executable,
+            args=[str(SERVER)],
+        )
 
-    async with stdio_client(params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
+        started = perf_counter()
 
-            available = {t.name for t in (await session.list_tools()).tools}
-            if name not in available:
-                raise MCPError(
-                    f"The server doesn't offer a tool called '{name}'.\n"
-                    f"It offers: {', '.join(sorted(available)) or '(nothing yet)'}\n"
-                    f"Register your tool in mcp_server.py — that's Milestone 1."
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                available = {
+                    tool.name
+                    for tool in (await session.list_tools()).tools
+                }
+
+                print(
+                    f"[MCP] connection ready in "
+                    f"{perf_counter() - started:.3f}s",
+                    file=sys.stderr,
                 )
 
-            result = await session.call_tool(name, arguments)
+                while True:
+                    request = await asyncio.to_thread(self.requests.get)
 
-            if getattr(result, "isError", False):
-                raise MCPError(f"The tool '{name}' returned an error: {_text(result)}")
+                    if request is None:
+                        break
 
-            return _unwrap(result)
+                    name, arguments, future = request
 
+                    try:
+                        if name not in available:
+                            raise MCPError(
+                                f"The server doesn't offer '{name}'. "
+                                "Check its registration in mcp_server.py."
+                            )
+
+                        result = await session.call_tool(name, arguments)
+
+                        if getattr(result, "isError", False):
+                            raise MCPError(
+                                f"The tool '{name}' returned an error: "
+                                f"{_text(result)}"
+                            )
+
+                        future.set_result(_unwrap(result))
+                    except Exception as exc:
+                        future.set_exception(
+                            MCPError(f"Couldn't call '{name}' over MCP: {exc}")
+                        )
+
+    def call(self, name, arguments):
+        if self.failure:
+            raise self.failure
+
+        if not self.thread.is_alive():
+            raise MCPError("The MCP connection has closed.")
+
+        future = Future()
+        self.requests.put((name, arguments, future))
+
+        try:
+            return future.result(timeout=60)
+        except TimeoutError as exc:
+            raise MCPError(
+                "MCP did not respond within 60 seconds. "
+                "Restart the application and check mcp_server.py."
+            ) from exc
+
+    def close(self):
+        if self.thread.is_alive():
+            self.requests.put(None)
+            self.thread.join(timeout=5)
+
+
+_connection = None
+
+
+def call_tool(name: str, arguments: dict):
+    """Start the connection on the first call, then reuse it."""
+
+    """ The first call starts the server and connects. Later calls reuse that
+connection until the program exits."""
+
+    global _connection
+
+    if _connection is None:
+        _connection = MCPConnection()
+
+    return _connection.call(name, arguments)
+
+
+def close_connection():
+    """Close the shared connection when the program finishes."""
+    if _connection is not None:
+        _connection.close()
+
+
+atexit.register(close_connection)
 
 def _unwrap(result):
     """

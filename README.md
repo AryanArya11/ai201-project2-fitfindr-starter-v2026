@@ -877,32 +877,60 @@ all four tools, while the empty search stopped after the first tool.
 
 **What I changed:**
 
+I changed `mcp_client.py` to keep one MCP connection open and reuse it
+for later tool calls instead of starting a new server for every search.
+
 **Which failure it was meant to fix:**
+
+Criterion 5 missed its one-second target. My timing checks showed that
+startup and initialization took most of the time, while the tool call
+itself was much faster.
 
 ### Run Log — After
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes required tools | At least 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before outfit tool | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Item and outfit stay connected | 5/5 pairs | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Captions meet all requirements | At least 4/5 captions per group | PASS (5/5) | PASS (5/5) | PASS (5/5) | PASS (5/5) | PASS (5/5) | MET in all five groups |
+| 5. Search respects budget and finishes within one second | All five searches; at least three nonempty | PASS | PASS | PASS | PASS | PASS |  MET (5/5 groups) |
 
 **Did it help, and how do I know:**
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+I changed `mcp_client.py` so the first tool call opens an MCP connection
+and later calls reuse it. Before, every search started and closed its own
+server connection. I kept the scenarios, prompts, targets, and search timer
+the same.
 
+This really helped the repeated searches. Before, they took about
+1.17 to 2.03 seconds. After, all 25 budget searches took about
+0.0033 to 0.0077 seconds and stayed within budget.
+
+The connection was already open when the budget scenarios ran.
+My separate first-search test still took 1.527 seconds, so this improvement
+does not guarantee that a search starting a new connection finishes within
+one second.
+
+The caption results also improved, but I did not change their prompts.
+I cannot attribute that improvement to connection reuse.
+
+[Before run log](results/run_2026-10-10_2222_before.md)
+[After run log](results/run_2026-10-11_1333_after.md)
 
 
 ---
 
 ## What's Still Broken
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+
+All five criteria met their targets in the after evaluation, but the
+budget searches used an already open connection. My separate first-search
+test took 1.527 seconds, so startup can still push a search past one second.
+
+Personally, I would next measure the remaining first-call costs to see
+what else could be improved. I stopped here to keep this milestone focused
+on one change and measure its effect clearly.
 
 
 
