@@ -753,15 +753,21 @@ the combined target.
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Matching query completes all three tools | At least 4 of 5 tries | MET | All five tries completed the required tools and returned a fit card. |
+| 2 | Impossible query stops before outfit generation | 5 of 5 tries | MET | Every try stopped before suggest_outfit and gave a message explaining what to change. |
+| 3 | Each run keeps its item and outfit connected | 5 of 5 query pairs | MET | The recorded handoffs matched each run's selected item and exact outfit suggestion. Neither run used the other run's results. |
+| 4 | Fit cards are distinct, short, and specific | At least 4 of 5 cards per group | MET | The five groups had 4, 4, 4, 5, and 4 acceptable cards. Each group met the target. |
+| 5 | Search stays within budget and responds quickly | All five searches stay within budget and finish within one second; at least three return matches | MISSED | Every group had four searches with matches and all prices stayed within budget, but every search exceeded one second. |
 
 **Diagnoses**
 
+Criterion 5 missed at the search tool's MCP connection step. My timer measures the whole call, including starting the server, connecting, searching, and closing the connection. The client repeats that setup for every search, so it adds work beyond filtering the 40 local listings.
 
+Personally, I think this setup could explain the repeated delay. Searches took about 1.17 to 2.03 seconds, and even the empty search exceeded one second. The budget filter worked, so the pattern points toward the time spent completing the search through MCP. I still need to measure setup and searching separately to confirm where most of the time goes.
+
+Some criterion 4 runs also failed because the model returned a 503 UNAVAILABLE error. Those runs stopped during outfit or caption generation. Each group still had at least four acceptable captions, so the criterion met its target despite those failures.
+
+I am keeping my original targets. For the next milestone, I want to measure the MCP setup time and see whether reusing a connection improves search speed.
 
 ---
 
