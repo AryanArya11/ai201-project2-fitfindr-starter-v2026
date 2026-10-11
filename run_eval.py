@@ -32,6 +32,7 @@ import argparse
 import datetime as dt
 import sys
 import traceback
+import json
 
 import config
 import scenarios as scenario_module
@@ -39,9 +40,12 @@ import scenarios as scenario_module
 
 def run_once(scenario, use_trace=True):
     """One scenario, one try. Returns everything worth recording."""
-    from agent import run_agent
+    import agent
+    from copy import deepcopy
+    from unittest.mock import patch
     from utils.data_loader import get_example_wardrobe, get_empty_wardrobe
     import trace as trace_module
+    from time import perf_counter
 
     wardrobe = (
         get_empty_wardrobe() if scenario["wardrobe"] == "empty" else get_example_wardrobe()
@@ -49,16 +53,75 @@ def run_once(scenario, use_trace=True):
 
     if use_trace:
         trace_module.start_trace()
-
     record = {"error": None, "session": None, "trace": "", "crashed": None}
+    record["handoffs"] = []
+
+    def record_outfit(new_item, wardrobe):
+        entry = {
+            "tool": "suggest_outfit",
+            "new_item": deepcopy(new_item),
+            "wardrobe": deepcopy(wardrobe),
+        }
+        record["handoffs"].append(entry)
+
+        result = original_outfit(new_item, wardrobe)
+        entry["returned"] = result
+        return result
+
+    def record_card(outfit, new_item):
+        entry = {
+            "tool": "create_fit_card",
+            "outfit": outfit,
+            "new_item": deepcopy(new_item),
+        }
+        record["handoffs"].append(entry)
+
+        result = original_card(outfit, new_item)
+        entry["returned"] = result
+        return result
+
+    original_outfit = agent.suggest_outfit
+    original_card = agent.create_fit_card
     try:
-        record["session"] = run_agent(scenario["query"], wardrobe)
-    except Exception as exc:  # noqa: BLE001 — a crash is a result worth logging
+        if scenario.get("search_only"):
+            inputs = scenario["search_inputs"]
+            session = agent.new_session(scenario["query"], wardrobe)
+            session["parsed"] = inputs.copy()
+            record["session"] = session
+
+            started = perf_counter()
+            try:
+                results = agent.call_tool("search_listings", inputs)
+            finally:
+                record["search_seconds"] = perf_counter() - started
+
+            session["search_results"] = results
+
+            trace_module.step(
+                "search_listings (via MCP)",
+                inputs=inputs,
+                returned=results,
+                note=f"Search took {record['search_seconds']:.3f} seconds",
+            )
+        else:
+            with patch.object(agent, "suggest_outfit", record_outfit), \
+                 patch.object(agent, "create_fit_card", record_card):
+                record["session"] = agent.run_agent(
+                    scenario["query"], wardrobe
+                )
+    except Exception as exc:  # noqa: BLE001 — a crash is a result worth 
         record["crashed"] = f"{type(exc).__name__}: {exc}"
         record["traceback"] = traceback.format_exc()
 
     if use_trace:
         record["trace"] = trace_module.get_trace()
+
+    if scenario.get("second_query"):
+        second_scenario = {
+            "query": scenario["second_query"],
+            "wardrobe": scenario["wardrobe"],
+        }
+        record["second_run"] = run_once(second_scenario, use_trace)
 
     return record
 
@@ -182,7 +245,7 @@ def write_report(rows, args):
 
             if record["crashed"]:
                 lines += ["Crashed:", "", "```", record["crashed"], "```", ""]
-                continue
+                
 
             session = record["session"] or {}
             item = session.get("selected_item") or {}
@@ -200,6 +263,47 @@ def write_report(rows, args):
                 lines += ["Fit card:", "", "```", str(session["fit_card"]), "```", ""]
             if record["trace"]:
                 lines += ["Trace:", "", "```", record["trace"], "```", ""]
+
+            lines += [
+                "First run state and handoffs:",
+                "",
+                "```json",
+                json.dumps({
+                    "session": record["session"],
+                    "handoffs": record["handoffs"],
+                    "search_seconds": record.get("search_seconds"),
+                }, indent=2),
+                "```",
+                "",
+            ]
+
+            if "second_run" in record:
+                second = record["second_run"]
+                second_session = second["session"] or {}
+
+                lines += [
+                    "Second run:",
+                    "",
+                    f"- Query: `{scenario['second_query']}`",
+                    f"- Crash: {second['crashed']}",
+                    f"- Error: {second_session.get('error')}",
+                    "",
+                    "State and handoffs:",
+                    "",
+                    "```json",
+                    json.dumps({
+                        "session": second_session,
+                        "handoffs": second["handoffs"],
+                    }, indent=2),
+                    "```",
+                    "",
+                    "Trace:",
+                    "",
+                    "```",
+                    second["trace"],
+                    "```",
+                    "",
+                ]
 
     path.write_text("\n".join(lines), encoding="utf-8")
 

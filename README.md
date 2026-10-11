@@ -446,20 +446,290 @@ change without making any model calls.
      `python run_eval.py --label before` runs everything and writes the table
      into results/. Paste it here and fill in the verdicts. -->
 
+
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Matching query completes required tools | At least 4/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Impossible query stops before outfit tool | 5/5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Item and outfit stay connected | 5/5 pairs | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Captions meet all requirements | At least 4/5 captions per group | PASS (4/5) | PASS (4/5) | PASS (4/5) | PASS (5/5) | PASS (4/5) | MET in all five groups |
+| 5. Search respects budget and finishes within one second | All five searches; at least three nonempty | FAIL | FAIL | FAIL | FAIL | FAIL | MISSED (0/5 groups) |
+
+I grouped the scenario results into one row per criterion. Each try for
+criterion 3 includes two queries. For criteria 4 and 5, each column combines
+the same numbered try across five items. Four acceptable captions pass
+criterion 4. Criterion 5 requires all searches to meet the budget and time
+limits, with at least three returning matches. Empty wardrobe is a separate
+diagnostic.
+
 
 **Real output from one try**, pasted as text, naming the file and function
 that produced it:
 
+### Real output from Try 1
+
+Full sessions, tool inputs, and all five tries are preserved in the
+[original run report](results/run_2026-10-10_2222_before.md).
+The JSON excerpts below retain selected fields from those records.
+For criterion 3, outfit strings are shortened to their first line;
+the complete strings remain in the report.
+
+#### Criterion 1: Matching query completes
+
+Produced by `run_eval.py::run_once`, calling `agent.py::run_agent`.
+
+```text
+- stopped early: no
+- selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+- search_results: 10
+
+[1] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+      →    branch: matches found, continuing to price comparison
+[2] compare_price
+      in:  Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      out: dict with keys: comparable_ids, median_price, relationship
+      →    This price is below the $24.00 median of 3 similar listings.
+[3] suggest_outfit
+      in:  dict with keys: new_item, wardrobe
+      out: Here are two outfit ideas featuring the **Y2K Baby Tee — Butterfly Print** and pieces from your saved wardrobe…
+[4] create_fit_card
+      in:  dict with keys: outfit, new_item
+      out: Scored this adorable Y2K baby tee with the sweetest butterfly print for just $18 on Depop. It has such a fun c…
 ```
 
+Fit card:
+
+```text
+Scored this adorable Y2K baby tee with the sweetest butterfly print for just $18 on Depop. It has such a fun classic Y2K streetwear vibe that is so easy to style with baggy denim or wide-leg trousers. I am seriously obsessed with how cute and nostalgic this piece is!
 ```
+
+#### Criterion 2: Impossible query stops early
+
+Produced by `run_eval.py::run_once`, calling `agent.py::run_agent`.
+
+```text
+- Query: designer ballgown size XXS under $5
+- stopped early: yes — No listings matched. Try different description keywords, a different size, or a higher budget.
+- selected_item: (none)
+- search_results: 0
+
+[1] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+      →    branch: empty search, stopping
+```
+
+The recorded handoffs list was empty:
+
+```json
+{
+  "handoffs": []
+}
+```
+
+#### Criterion 3: Item and outfit stay connected
+
+Produced by `run_eval.py::run_once`, calling `agent.py::run_agent`.
+The evaluator records the actual inputs and outputs of
+`tools.py::suggest_outfit` and `tools.py::create_fit_card`.
+
+First run, selected fields and first-line outfit excerpts:
+
+```json
+{
+  "session": {
+    "query": "vintage graphic tee under $30, size M",
+    "selected_item": {"id": "lst_002"},
+    "outfit_suggestion": "Here are two outfits featuring the **Y2K Baby Tee — Butterfly Print** and pieces from your saved wardrobe:"
+  },
+  "handoffs": [
+    {
+      "tool": "suggest_outfit",
+      "new_item": {"id": "lst_002"},
+      "returned": "Here are two outfits featuring the **Y2K Baby Tee — Butterfly Print** and pieces from your saved wardrobe:"
+    },
+    {
+      "tool": "create_fit_card",
+      "new_item": {"id": "lst_002"},
+      "outfit": "Here are two outfits featuring the **Y2K Baby Tee — Butterfly Print** and pieces from your saved wardrobe:"
+    }
+  ]
+}
+```
+
+Second run, selected fields and first-line outfit excerpts:
+
+```json
+{
+  "session": {
+    "query": "90s track Jacket in size M",
+    "selected_item": {"id": "lst_004"},
+    "outfit_suggestion": "Here are two outfit ideas featuring the **90s Track Jacket — Navy/White Stripe** and pieces from your saved wardrobe:"
+  },
+  "handoffs": [
+    {
+      "tool": "suggest_outfit",
+      "new_item": {"id": "lst_004"},
+      "returned": "Here are two outfit ideas featuring the **90s Track Jacket — Navy/White Stripe** and pieces from your saved wardrobe:"
+    },
+    {
+      "tool": "create_fit_card",
+      "new_item": {"id": "lst_004"},
+      "outfit": "Here are two outfit ideas featuring the **90s Track Jacket — Navy/White Stripe** and pieces from your saved wardrobe:"
+    }
+  ]
+}
+```
+
+The full records show matching item dictionaries and exact outfit strings
+within each run. The second run used the jacket and its own outfit.
+
+#### Criterion 4: Captions are distinct, short, and specific
+
+Produced by `run_eval.py::run_once`, calling `agent.py::run_agent`
+and `tools.py::create_fit_card`.
+
+These are Try 1 results from all five caption scenarios.
+
+**Graphic tee**
+
+```text
+- selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+
+Scored this adorable Y2K baby tee with the cutest butterfly graphic for just $18. I am so obsessed with how it brings that classic early 2000s streetwear vibe to my rotation. I found it scrolling on Depop and can't wait to style it with baggy denim and chunky sneakers.
+```
+
+**Track jacket**
+
+```text
+- selected_item: 90s Track Jacket — Navy/White Stripe ($45.0, poshmark)
+
+Scored this navy and white 90s track jacket on Poshmark for just $45, and it’s the ultimate lightweight layer. I love how it leans right into that retro athletic aesthetic for an effortless streetwear look. Can't wait to style this all season long!
+```
+
+**Slip dress**
+
+```text
+- selected_item: 90s Silk Slip Dress — Floral, Midi Length ($30.0, depop)
+
+Scored this gorgeous 90s floral midi slip dress on Depop for just $30. I love how it captures that effortless vintage streetwear layer with a denim jacket and sneakers. It's such a versatile piece to add to the wardrobe!
+```
+
+**Sneakers**
+
+```text
+- selected_item: Platform Sneakers — White Chunky Sole ($48.0, poshmark)
+- stopped early: yes — Couldn't finish the outfit step. Couldn't reach the model: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}
+```
+
+**Denim jacket**
+
+```text
+- selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+
+Scored this cropped light wash denim jacket on Poshmark for just $42, and it adds the ultimate vintage streetwear edge to any outfit. I love playing with the proportions by pairing it with baggy dark-wash jeans and a fitted white tank. It's such a versatile piece with amazing structured shoulders that I can't wait to wear all season long.
+```
+
+Four captions met all requirements. Each had three sentences, a different
+full opening sentence, and the correct item, price, and platform.
+The sneakers run failed to produce a caption, so this group met the
+4-of-5 target.
+
+#### Criterion 5: Search respects budget and responds quickly
+
+Produced by `run_eval.py::run_once`, calling
+`mcp_client.py::call_tool` for `tools.py::search_listings`.
+
+These selected JSON fields show Try 1 for all five budget searches.
+The duration includes MCP server startup and the search call.
+
+**Graphic tee**
+
+```json
+{
+  "session": {
+    "query": "graphic tee under $30",
+    "parsed": {"description": "graphic tee", "max_price": 30},
+    "search_results": [
+      {"id": "lst_002", "price": 18.0},
+      {"id": "lst_006", "price": 24.0},
+      {"id": "lst_017", "price": 15.0},
+      {"id": "lst_033", "price": 19.0},
+      {"id": "lst_011", "price": 27.0},
+      {"id": "lst_015", "price": 26.0}
+    ]
+  },
+  "search_seconds": 2.0138159999914933
+}
+```
+
+**Track jacket**
+
+```json
+{
+  "session": {
+    "query": "track jacket under $50",
+    "parsed": {"description": "track jacket", "max_price": 50},
+    "search_results": [
+      {"id": "lst_004", "price": 45.0},
+      {"id": "lst_007", "price": 42.0},
+      {"id": "lst_032", "price": 33.0}
+    ]
+  },
+  "search_seconds": 2.0087140999967232
+}
+```
+
+**Slip dress**
+
+```json
+{
+  "session": {
+    "query": "silk slip dress under $40",
+    "parsed": {"description": "silk slip dress", "max_price": 40},
+    "search_results": [
+      {"id": "lst_013", "price": 30.0},
+      {"id": "lst_029", "price": 28.0}
+    ]
+  },
+  "search_seconds": 1.957714299991494
+}
+```
+
+**Sneakers**
+
+```json
+{
+  "session": {
+    "query": "platform sneakers under $50",
+    "parsed": {"description": "platform sneakers", "max_price": 50},
+    "search_results": [
+      {"id": "lst_019", "price": 48.0},
+      {"id": "lst_035", "price": 20.0}
+    ]
+  },
+  "search_seconds": 1.8458296000026166
+}
+```
+
+**No affordable match**
+
+```json
+{
+  "session": {
+    "query": "designer ballgown under $5",
+    "parsed": {"description": "designer ballgown", "max_price": 5},
+    "search_results": []
+  },
+  "search_seconds": 1.9309103999985382
+}
+```
+
+Every returned listing stayed within budget, and four searches returned
+matches. However, every search exceeded one second, so this group missed
+the combined target.
 
 ---
 
